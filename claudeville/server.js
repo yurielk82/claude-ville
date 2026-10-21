@@ -1,7 +1,7 @@
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
 
 // ─── 어댑터 로드 ─────────────────────────────────────
 const {
@@ -10,35 +10,36 @@ const {
   getAllWatchPaths,
   getActiveProviders,
   adapters,
-} = require('./adapters');
+} = require("./adapters");
 
 // ─── Usage Quota 서비스 ──────────────────────────────
-const usageQuota = require('./services/usageQuota');
+const usageQuota = require("./services/usageQuota");
 
 // Claude 어댑터 (팀/태스크는 Claude 전용)
-const claudeAdapter = adapters.find(a => a.provider === 'claude');
+const claudeAdapter = adapters.find((a) => a.provider === "claude");
 
 // ─── 설정 ───────────────────────────────────────────────
-const PORT = 4000;
+const PORT = Number(process.env.PORT) || 4000;
+const HOST = process.env.HOST || "127.0.0.1";
 const STATIC_DIR = __dirname;
 const ACTIVE_THRESHOLD_MS = 2 * 60 * 1000; // 2분
 
 // ─── MIME 타입 매핑 ─────────────────────────────────────
 const MIME_TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'application/javascript; charset=utf-8',
-  '.mjs': 'application/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.ttf': 'font/ttf',
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".mjs": "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
 };
 
 // ─── WebSocket 클라이언트 관리 ──────────────────────────
@@ -47,14 +48,16 @@ const wsClients = new Set();
 // ─── 유틸리티 함수 ──────────────────────────────────────
 
 function setCorsHeaders(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
 function sendJson(res, statusCode, data) {
   setCorsHeaders(res);
-  res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.writeHead(statusCode, {
+    "Content-Type": "application/json; charset=utf-8",
+  });
   res.end(JSON.stringify(data));
 }
 
@@ -71,10 +74,14 @@ function sendError(res, statusCode, message) {
 function handleGetSessions(req, res) {
   try {
     const sessions = getAllSessions(ACTIVE_THRESHOLD_MS);
-    sendJson(res, 200, { sessions, count: sessions.length, timestamp: Date.now() });
+    sendJson(res, 200, {
+      sessions,
+      count: sessions.length,
+      timestamp: Date.now(),
+    });
   } catch (err) {
-    console.error('세션 조회 실패:', err.message);
-    sendError(res, 500, '세션 정보를 불러올 수 없습니다.');
+    console.error("세션 조회 실패:", err.message);
+    sendError(res, 500, "세션 정보를 불러올 수 없습니다.");
   }
 }
 
@@ -87,8 +94,8 @@ function handleGetTeams(req, res) {
     const teams = claudeAdapter ? claudeAdapter.getTeams() : [];
     sendJson(res, 200, { teams, count: teams.length });
   } catch (err) {
-    console.error('팀 조회 실패:', err.message);
-    sendError(res, 500, '팀 정보를 불러올 수 없습니다.');
+    console.error("팀 조회 실패:", err.message);
+    sendError(res, 500, "팀 정보를 불러올 수 없습니다.");
   }
 }
 
@@ -101,8 +108,8 @@ function handleGetTasks(req, res) {
     const taskGroups = claudeAdapter ? claudeAdapter.getTasks() : [];
     sendJson(res, 200, { taskGroups, totalGroups: taskGroups.length });
   } catch (err) {
-    console.error('태스크 조회 실패:', err.message);
-    sendError(res, 500, '태스크 정보를 불러올 수 없습니다.');
+    console.error("태스크 조회 실패:", err.message);
+    sendError(res, 500, "태스크 정보를 불러올 수 없습니다.");
   }
 }
 
@@ -113,17 +120,17 @@ function handleGetTasks(req, res) {
 function handleGetSessionDetail(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
-    const sessionId = url.searchParams.get('sessionId');
-    const project = url.searchParams.get('project');
-    const provider = url.searchParams.get('provider') || 'claude';
+    const sessionId = url.searchParams.get("sessionId");
+    const project = url.searchParams.get("project");
+    const provider = url.searchParams.get("provider") || "claude";
 
-    if (!sessionId) return sendError(res, 400, 'sessionId 필수');
+    if (!sessionId) return sendError(res, 400, "sessionId 필수");
 
     const result = getSessionDetailByProvider(provider, sessionId, project);
     sendJson(res, 200, result);
   } catch (err) {
-    console.error('세션 상세 조회 실패:', err.message);
-    sendError(res, 500, '세션 상세 정보를 불러올 수 없습니다.');
+    console.error("세션 상세 조회 실패:", err.message);
+    sendError(res, 500, "세션 상세 정보를 불러올 수 없습니다.");
   }
 }
 
@@ -136,8 +143,8 @@ function handleGetProviders(req, res) {
     const providers = getActiveProviders();
     sendJson(res, 200, { providers, count: providers.length });
   } catch (err) {
-    console.error('프로바이더 조회 실패:', err.message);
-    sendError(res, 500, '프로바이더 정보를 불러올 수 없습니다.');
+    console.error("프로바이더 조회 실패:", err.message);
+    sendError(res, 500, "프로바이더 정보를 불러올 수 없습니다.");
   }
 }
 
@@ -150,8 +157,8 @@ function handleGetUsage(req, res) {
     const usage = usageQuota.fetchUsage();
     sendJson(res, 200, usage);
   } catch (err) {
-    console.error('사용량 조회 실패:', err.message);
-    sendError(res, 500, '사용량 정보를 불러올 수 없습니다.');
+    console.error("사용량 조회 실패:", err.message);
+    sendError(res, 500, "사용량 정보를 불러올 수 없습니다.");
   }
 }
 
@@ -159,78 +166,87 @@ function handleGetUsage(req, res) {
 
 function handleStaticFile(req, res) {
   try {
-    let filePath = path.join(STATIC_DIR, req.url === '/' ? 'index.html' : req.url);
+    let filePath = path.join(
+      STATIC_DIR,
+      req.url === "/" ? "index.html" : req.url,
+    );
 
     const resolvedPath = path.resolve(filePath);
     if (!resolvedPath.startsWith(STATIC_DIR)) {
-      return sendError(res, 403, 'Forbidden');
+      return sendError(res, 403, "Forbidden");
     }
 
-    filePath = resolvedPath.split('?')[0];
+    filePath = resolvedPath.split("?")[0];
 
     if (!fs.existsSync(filePath)) {
-      return sendError(res, 404, 'Not Found');
+      return sendError(res, 404, "Not Found");
     }
 
     const stat = fs.statSync(filePath);
     if (stat.isDirectory()) {
-      filePath = path.join(filePath, 'index.html');
+      filePath = path.join(filePath, "index.html");
       if (!fs.existsSync(filePath)) {
-        return sendError(res, 404, 'Not Found');
+        return sendError(res, 404, "Not Found");
       }
     }
 
     const ext = path.extname(filePath).toLowerCase();
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-    const isText = contentType.includes('text') ||
-                   contentType.includes('javascript') ||
-                   contentType.includes('json') ||
-                   contentType.includes('svg');
+    const contentType = MIME_TYPES[ext] || "application/octet-stream";
+    const isText =
+      contentType.includes("text") ||
+      contentType.includes("javascript") ||
+      contentType.includes("json") ||
+      contentType.includes("svg");
 
     setCorsHeaders(res);
     res.writeHead(200, {
-      'Content-Type': contentType,
-      'Cache-Control': 'no-cache',
+      "Content-Type": contentType,
+      "Cache-Control": "no-cache",
     });
 
-    const stream = fs.createReadStream(filePath, isText ? { encoding: 'utf-8' } : undefined);
+    const stream = fs.createReadStream(
+      filePath,
+      isText ? { encoding: "utf-8" } : undefined,
+    );
     stream.pipe(res);
-    stream.on('error', (err) => {
-      console.error('파일 스트림 에러:', err.message);
+    stream.on("error", (err) => {
+      console.error("파일 스트림 에러:", err.message);
       if (!res.headersSent) {
-        sendError(res, 500, 'Internal Server Error');
+        sendError(res, 500, "Internal Server Error");
       }
     });
   } catch (err) {
-    console.error('정적 파일 서빙 실패:', err.message);
+    console.error("정적 파일 서빙 실패:", err.message);
     if (!res.headersSent) {
-      sendError(res, 500, 'Internal Server Error');
+      sendError(res, 500, "Internal Server Error");
     }
   }
 }
 
 // ─── WebSocket 구현 (RFC 6455) ──────────────────────────
 
-const WS_MAGIC_STRING = '258EAFA5-E914-47DA-95CA-5AB5DC563B35';
+const WS_MAGIC_STRING = "258EAFA5-E914-47DA-95CA-5AB5DC563B35";
 
 function handleWebSocketUpgrade(req, socket) {
-  const key = req.headers['sec-websocket-key'];
+  const key = req.headers["sec-websocket-key"];
   if (!key) {
     socket.destroy();
     return;
   }
 
   const acceptKey = crypto
-    .createHash('sha1')
+    .createHash("sha1")
     .update(key + WS_MAGIC_STRING)
-    .digest('base64');
+    .digest("base64");
 
   const responseStr =
-    'HTTP/1.1 101 Switching Protocols\r\n' +
-    'Upgrade: websocket\r\n' +
-    'Connection: Upgrade\r\n' +
-    'Sec-WebSocket-Accept: ' + acceptKey + '\r\n' +
-    '\r\n';
+    "HTTP/1.1 101 Switching Protocols\r\n" +
+    "Upgrade: websocket\r\n" +
+    "Connection: Upgrade\r\n" +
+    "Sec-WebSocket-Accept: " +
+    acceptKey +
+    "\r\n" +
+    "\r\n";
 
   socket.write(responseStr, () => {
     wsClients.add(socket);
@@ -241,7 +257,7 @@ function handleWebSocketUpgrade(req, socket) {
     }, 100);
   });
 
-  socket.on('data', (buffer) => {
+  socket.on("data", (buffer) => {
     try {
       handleWebSocketFrame(socket, buffer);
     } catch (err) {
@@ -249,11 +265,11 @@ function handleWebSocketUpgrade(req, socket) {
     }
   });
 
-  socket.on('close', () => {
+  socket.on("close", () => {
     wsClients.delete(socket);
   });
 
-  socket.on('error', () => {
+  socket.on("error", () => {
     wsClients.delete(socket);
   });
 }
@@ -297,10 +313,10 @@ function handleWebSocketFrame(socket, buffer) {
 
   switch (opcode) {
     case 0x1:
-      handleTextMessage(socket, payload.toString('utf-8'));
+      handleTextMessage(socket, payload.toString("utf-8"));
       break;
     case 0x8:
-      socket.end(createWebSocketFrame('', 0x8));
+      socket.end(createWebSocketFrame("", 0x8));
       wsClients.delete(socket);
       break;
     case 0x9:
@@ -314,15 +330,17 @@ function handleWebSocketFrame(socket, buffer) {
 function handleTextMessage(socket, message) {
   try {
     const data = JSON.parse(message);
-    if (data.type === 'ping') {
-      wsSend(socket, { type: 'pong', timestamp: Date.now() });
+    if (data.type === "ping") {
+      wsSend(socket, { type: "pong", timestamp: Date.now() });
     }
-  } catch { /* 무시 */ }
+  } catch {
+    /* 무시 */
+  }
 }
 
 function createWebSocketFrame(data, opcode = 0x1) {
   const isBuffer = Buffer.isBuffer(data);
-  const payload = isBuffer ? data : Buffer.from(String(data), 'utf-8');
+  const payload = isBuffer ? data : Buffer.from(String(data), "utf-8");
   const length = payload.length;
 
   let header;
@@ -351,7 +369,7 @@ function wsSend(socket, data) {
       socket.write(createWebSocketFrame(JSON.stringify(data)));
     }
   } catch (err) {
-    if (err.code !== 'EPIPE' && err.code !== 'ECONNRESET') {
+    if (err.code !== "EPIPE" && err.code !== "ECONNRESET") {
       // 전송 에러 무시
     }
     wsClients.delete(socket);
@@ -378,7 +396,7 @@ function wsBroadcast(data) {
 function sendInitialData(socket) {
   try {
     wsSend(socket, {
-      type: 'init',
+      type: "init",
       sessions: getAllSessions(ACTIVE_THRESHOLD_MS),
       teams: claudeAdapter ? claudeAdapter.getTeams() : [],
       usage: usageQuota.fetchUsage(),
@@ -395,14 +413,14 @@ function broadcastUpdate() {
   if (wsClients.size === 0) return;
   try {
     wsBroadcast({
-      type: 'update',
+      type: "update",
       sessions: getAllSessions(ACTIVE_THRESHOLD_MS),
       teams: claudeAdapter ? claudeAdapter.getTeams() : [],
       usage: usageQuota.fetchUsage(),
       timestamp: Date.now(),
     });
   } catch (err) {
-    console.error('[Watch] 데이터 처리 실패:', err.message);
+    console.error("[Watch] 데이터 처리 실패:", err.message);
   }
 }
 
@@ -419,18 +437,22 @@ function startFileWatcher() {
 
   for (const wp of watchPaths) {
     try {
-      if (wp.type === 'file') {
+      if (wp.type === "file") {
         if (!fs.existsSync(wp.path)) continue;
         fs.watch(wp.path, (eventType) => {
-          if (eventType === 'change') debouncedBroadcast();
+          if (eventType === "change") debouncedBroadcast();
         });
         watchCount++;
-      } else if (wp.type === 'directory') {
+      } else if (wp.type === "directory") {
         if (!fs.existsSync(wp.path)) continue;
-        fs.watch(wp.path, { recursive: wp.recursive || false }, (eventType, filename) => {
-          if (wp.filter && filename && !filename.endsWith(wp.filter)) return;
-          debouncedBroadcast();
-        });
+        fs.watch(
+          wp.path,
+          { recursive: wp.recursive || false },
+          (eventType, filename) => {
+            if (wp.filter && filename && !filename.endsWith(wp.filter)) return;
+            debouncedBroadcast();
+          },
+        );
         watchCount++;
       }
     } catch {
@@ -444,13 +466,13 @@ function startFileWatcher() {
   setInterval(() => {
     if (wsClients.size > 0) broadcastUpdate();
   }, 2000);
-  console.log('[Watch] 2초 주기 폴링 시작');
+  console.log("[Watch] 2초 주기 폴링 시작");
 }
 
 // ─── HTTP 서버 ──────────────────────────────────────────
 
 const server = http.createServer((req, res) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     setCorsHeaders(res);
     res.writeHead(204);
     res.end();
@@ -460,31 +482,40 @@ const server = http.createServer((req, res) => {
   const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
   const pathname = parsedUrl.pathname;
 
-  if (req.method === 'GET') {
+  if (req.method === "GET") {
     switch (pathname) {
-      case '/api/sessions':
+      case "/api/sessions":
         return handleGetSessions(req, res);
-      case '/api/teams':
+      case "/api/teams":
         return handleGetTeams(req, res);
-      case '/api/tasks':
+      case "/api/tasks":
         return handleGetTasks(req, res);
-      case '/api/session-detail':
+      case "/api/session-detail":
         return handleGetSessionDetail(req, res);
-      case '/api/providers':
+      case "/api/providers":
         return handleGetProviders(req, res);
-      case '/api/usage':
+      case "/api/usage":
         return handleGetUsage(req, res);
     }
   }
 
   // 위젯 파일 서빙 (/widget.html, /widget.css)
-  if (pathname === '/widget.html' || pathname === '/widget.css') {
-    const widgetFile = path.join(__dirname, '..', 'widget', 'Resources', pathname);
+  if (pathname === "/widget.html" || pathname === "/widget.css") {
+    const widgetFile = path.join(
+      __dirname,
+      "..",
+      "widget",
+      "Resources",
+      pathname,
+    );
     if (fs.existsSync(widgetFile)) {
       const ext = path.extname(widgetFile).toLowerCase();
       setCorsHeaders(res);
-      res.writeHead(200, { 'Content-Type': MIME_TYPES[ext], 'Cache-Control': 'no-cache' });
-      fs.createReadStream(widgetFile, { encoding: 'utf-8' }).pipe(res);
+      res.writeHead(200, {
+        "Content-Type": MIME_TYPES[ext],
+        "Cache-Control": "no-cache",
+      });
+      fs.createReadStream(widgetFile, { encoding: "utf-8" }).pipe(res);
       return;
     }
   }
@@ -492,8 +523,11 @@ const server = http.createServer((req, res) => {
   handleStaticFile(req, res);
 });
 
-server.on('upgrade', (req, socket, head) => {
-  if (req.headers.upgrade && req.headers.upgrade.toLowerCase() === 'websocket') {
+server.on("upgrade", (req, socket, head) => {
+  if (
+    req.headers.upgrade &&
+    req.headers.upgrade.toLowerCase() === "websocket"
+  ) {
     handleWebSocketUpgrade(req, socket);
   } else {
     socket.destroy();
@@ -523,23 +557,25 @@ const ASCII_LOGO = `
 ╚══════════════════════════════════════════════════════╝
 `;
 
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
   console.log(ASCII_LOGO);
-  console.log(`  서버 실행 중: http://localhost:${PORT}`);
-  console.log('');
+  console.log(`  서버 실행 중: http://${HOST}:${PORT}`);
+  console.log("");
 
   // 활성 프로바이더 표시
   const providers = getActiveProviders();
   if (providers.length === 0) {
-    console.log('  [!] 활성 프로바이더 없음');
-    console.log('      ~/.claude/ , ~/.codex/ , ~/.gemini/ 중 하나가 필요합니다');
+    console.log("  [!] 활성 프로바이더 없음");
+    console.log(
+      "      ~/.claude/ , ~/.codex/ , ~/.gemini/ 중 하나가 필요합니다",
+    );
   } else {
-    console.log('  활성 프로바이더:');
+    console.log("  활성 프로바이더:");
     for (const p of providers) {
       console.log(`    - ${p.name} (${p.homeDir})`);
     }
   }
-  console.log('');
+  console.log("");
 
   // Usage Quota 서비스 초기화
   usageQuota.init();
@@ -549,31 +585,33 @@ server.listen(PORT, () => {
 
 // ─── 에러 핸들링 ────────────────────────────────────────
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
     console.error(`포트 ${PORT}가 이미 사용 중입니다.`);
   } else {
-    console.error('서버 에러:', err.message);
+    console.error("서버 에러:", err.message);
   }
 });
 
-process.on('uncaughtException', (err) => {
-  console.error('처리되지 않은 예외:', err.message);
+process.on("uncaughtException", (err) => {
+  console.error("처리되지 않은 예외:", err.message);
 });
 
-process.on('unhandledRejection', (reason) => {
-  console.error('처리되지 않은 프로미스 거부:', reason);
+process.on("unhandledRejection", (reason) => {
+  console.error("처리되지 않은 프로미스 거부:", reason);
 });
 
-process.on('SIGINT', () => {
-  console.log('\n서버를 종료합니다...');
+process.on("SIGINT", () => {
+  console.log("\n서버를 종료합니다...");
   for (const socket of wsClients) {
     try {
-      socket.end(createWebSocketFrame('', 0x8));
-    } catch { /* 무시 */ }
+      socket.end(createWebSocketFrame("", 0x8));
+    } catch {
+      /* 무시 */
+    }
   }
   server.close(() => {
-    console.log('서버 종료 완료');
+    console.log("서버 종료 완료");
     process.exit(0);
   });
 });

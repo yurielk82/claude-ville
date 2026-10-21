@@ -1,0 +1,37 @@
+# /etc/systemd/system/claude-ville.service
+# 설치: sudo install -m 0644 deploy/claude-ville.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now claude-ville
+# 비운영 상시 도구라 tools.slice 로 간다(global-rules targets/tools-units.txt → install/system_units.py drop-in).
+[Unit]
+Description=ClaudeVille (ville.dvsharp.com) Claude Code·Codex 세션 시각화 대시보드
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/GitHub/claude-ville
+# PATH 의 node bin 에 claude CLI 가 있어야 /api/usage 가 계정 정보를 읽는다(claude auth status).
+Environment=PATH=/home/ubuntu/.local/share/node/current/bin:/usr/local/bin:/usr/bin:/bin
+Environment=HOME=/home/ubuntu
+Environment=TZ=Asia/Seoul
+Environment=LANG=C.UTF-8
+Environment=HOST=127.0.0.1
+Environment=PORT=4000
+ExecStart=/home/ubuntu/.local/share/node/current/bin/node /home/ubuntu/GitHub/claude-ville/claudeville/server.js
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=claude-ville
+# 세션 로그(~/.claude·~/.codex·~/.gemini)는 읽기만 한다.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target
