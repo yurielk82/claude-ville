@@ -11,8 +11,8 @@ async function urlFor(protocol, host) {
 
 test("https 페이지는 wss 로 연결한다", async () => {
   assert.equal(
-    await urlFor("https:", "ville.dvsharp.com"),
-    "wss://ville.dvsharp.com",
+    await urlFor("https:", "cv.dvsharp.com"),
+    "wss://cv.dvsharp.com",
   );
 });
 
