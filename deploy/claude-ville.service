@@ -2,7 +2,7 @@
 # 설치: sudo install -m 0644 deploy/claude-ville.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now claude-ville
 # 비운영 상시 도구라 tools.slice 로 간다(global-rules targets/tools-units.txt → install/system_units.py drop-in).
 [Unit]
-Description=ClaudeVille (ville.dvsharp.com) Claude Code·Codex 세션 시각화 대시보드
+Description=ClaudeVille (cv.dvsharp.com) Claude Code·Codex 세션 시각화 대시보드
 After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=300
